@@ -24,26 +24,24 @@ database = "employee"
 session = None
 engine = None
 
-def create_database_connection():
-    try:
-        global session
-        global engine
-        engine = create_engine(
-            f"mysql+mysqlconnector://{username}:{password}@{host}:{port}/{database}?connect_timeout=30",
-            echo=True, pool_recycle=3600, pool_size=10, max_overflow=5
-        )
-        Session = sessionmaker(bind=engine)
-        session = Session() 
-        return engine
-    except TimeoutError as e:
-        if engine:
-            time.sleep(5)
-            if session:
-                session.close()
-            engine.dispose()
-        return create_database_connection()
+def create_database_connection(max_retries=10):
+    global session, engine
+    retries = 0
+    while retries < max_retries:
+        try:
+            engine = create_engine(
+                f"mysql+mysqlconnector://{username}:{password}@{host}:{port}/{database}?connect_timeout=30",
+                echo=True, pool_recycle=3600, pool_size=10, max_overflow=5
+            )
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            return engine, session
+        except OperationalError as e:
+            retries += 1
+            if retries < max_retries:
+                time.sleep(6)
 
-engine = create_database_connection()
+engine, session = create_database_connection()
 
 Base = declarative_base()
 
